@@ -3,13 +3,13 @@ from selenium import webdriver
 import requests
 import time
 from urllib import parse
-
+import re
 class Spider(object):
     def __init__(self):
         self.web = webdriver.Chrome()
         self.web.get('https://user.qzone.qq.com')
         self.__username = '1272082503'
-        self.__password = ''
+        self.__password = 'yuanhao110110HAO'
         self.headers = {
             'host': 'h5.qzone.qq.com',
             'accept-encoding': 'gzip, deflate, br',
@@ -84,6 +84,13 @@ class Spider(object):
         url = url + parse.urlencode(params)
         return url
 
+    def get_json(self, str1):
+        arr = re.findall(r'[^()]+', str1)
+        json = ""
+        for i in range(1, len(arr) - 1):
+            json += arr[i]
+        return json
+
     def get_mood_detail(self):
         urlMood = self.get_mood_url()
         url_Mood = urlMood + '&uin=' + str(1272082503)
@@ -91,9 +98,10 @@ class Spider(object):
         while pos < 2000:
             url__ = url_Mood + '&pos=' + str(pos)
             mood_detail = self.req.get(url=url__, headers=self.headers)
-            print(1272082503, mood_detail.content.decode("utf-8"))
+            jsonContent = self.get_json(str(mood_detail.content.decode('utf-8')))
+            print(1272082503,jsonContent)
             with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
-                w.write(str(mood_detail.content.decode('utf-8')))
+                w.write(jsonContent)
             pos += 20
         time.sleep(2)
 
