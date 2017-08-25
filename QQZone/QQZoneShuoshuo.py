@@ -18,8 +18,17 @@ class Spider(object):
             'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36',
             'connection': 'keep-alive'
         }
+        self.headers2 = {
+            'host': 'h5.qzone.qq.com',
+            'accept-encoding': 'gzip, deflate, br',
+            'accept-language': 'zh-CN,zh;q=0.8',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36',
+            'connection': 'keep-alive'
+        }
         self.req = requests.Session()
         self.cookies = {}
+        self.qzonetoken = ""
 
     def login(self):
         self.web.switch_to_frame('login_frame')
@@ -43,12 +52,15 @@ class Spider(object):
         self.headers['Cookie'] = self.cookies
         self.web.quit()
 
-    def get_frends_url(self):
-        url = 'https://h5.qzone.qq.com/proxy/domain/base.qzone.qq.com/cgi-bin/right/get_entryuinlist.cgi?'
-        params = {"uin": self.__username,
-                  "fupdate": 1,
-                  "action": 1,
-                  "g_tk": self.g_tk}
+    def get_aggree_url(self):
+        url = "https://h5.qzone.qq.com/proxy/domain/users.qzone.qq.com/cgi-bin/likes/get_like_list_app?"
+        params = {
+            "unikey": "",
+            "begin_uin":0,
+            "query_count":60,
+            "if_first_page=1":1,
+            "g_tk": self.g_tk
+        }
         url = url + parse.urlencode(params)
         return url
 
@@ -73,11 +85,11 @@ class Spider(object):
         return url
 
     def get_mood_detail(self):
-        url = self.get_mood_url()
-        url_ = url + '&uin=' + str(1272082503)
+        urlMood = self.get_mood_url()
+        url_Mood = urlMood + '&uin=' + str(1272082503)
         pos = 0
         while pos < 2000:
-            url__ = url_ + '&pos=' + str(pos)
+            url__ = url_Mood + '&pos=' + str(pos)
             mood_detail = self.req.get(url=url__, headers=self.headers)
             print(1272082503, mood_detail.content.decode("utf-8"))
             with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
