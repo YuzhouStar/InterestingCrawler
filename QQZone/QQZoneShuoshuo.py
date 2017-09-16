@@ -5,12 +5,16 @@ import time
 from urllib import parse
 import re
 import redis
+import json
+
+
 class Spider(object):
+
     def __init__(self):
         self.web = webdriver.Chrome()
         self.web.get('https://user.qzone.qq.com')
         self.__username = '1272082503'
-        self.__password = 'yuanhao110110HAO'
+        self.__password = ''
         self.headers = {
             'host': 'h5.qzone.qq.com',
             'accept-encoding': 'gzip, deflate, br',
@@ -30,7 +34,7 @@ class Spider(object):
         self.req = requests.Session()
         self.cookies = {}
         self.qzonetoken = ""
-        self.connect_redis()
+        self.re = connect_redis()
         self.content = []
 
     def login(self):
@@ -87,6 +91,21 @@ class Spider(object):
         url = url + parse.urlencode(params)
         return url
 
+
+    def get_aggree_url(self):
+        url = 'https://user.qzone.qq.com/proxy/domain/users.qzone.qq.com/cgi-bin/likes/get_like_list_app?'
+        params = {
+            "uin": "1272082503",
+            "unikey": 'http%3A%2F%2Fuser.qzone.qq.com%2F1272082503%2Fmood%2F4770d24be703bc592c390500.1',
+            "begin_uin": 0,
+            "query_count": 60,
+            "if_first_page": 1,
+            "g_tk": self.g_tk,
+        }
+        url = url + parse.urlencode(params)
+        return url
+
+
     def get_json(self, str1):
         arr = re.findall(r'[^()]+', str1)
         json = ""
@@ -105,9 +124,9 @@ class Spider(object):
             self.content.append(jsonContent)
 
             print(1272082503,jsonContent)
-            #存储到json文件
-            # with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
-            #     w.write(jsonContent)
+            # 存储到json文件
+            with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
+                w.write(jsonContent)
             pos += 20
             print(pos)
         # time.sleep(2)
@@ -115,9 +134,6 @@ class Spider(object):
         print(self.content)
         print("finish")
 
-    def connect_redis(self):
-        pool = redis.ConnectionPool(host="127.0.0.1", port=6379)
-        self.re = redis.Redis(connection_pool=pool)
 
     def get_g_tk(self):
         p_skey = self.cookies[self.cookies.find('p_skey=') + 7: self.cookies.find(';', self.cookies.find('p_skey='))]
@@ -127,9 +143,36 @@ class Spider(object):
         print('g_tk', h & 2147483647)
         self.g_tk = h & 2147483647
 
+    def get_unilikeKey(self, mood_detail):
+        jsonData = json.load(mood_detail)
+
+
+def connect_redis():
+    pool = redis.ConnectionPool(host="127.0.0.1", port=6379)
+    re = redis.Redis(connection_pool=pool)
+    return re
+
+
+def doAnalysis():
+    # re = connect_redis()
+    # data = re.get("QQ")
+    # data = data.decode('utf-8').replace('\\', '')
+    # print(data)
+    f = open("data0.json", encoding='utf-8')
+    data = json.load(f)
+    for item in data['msglist']:
+        print(item['content'])
+        print(item.keys())
+        # print(item['pic'])
+        for itemKey in item['pic']:
+            print(itemKey['curlikekey'])
+        for item2 in item['commentlist']:
+            print(item2['name'])
+
 
 if __name__ == '__main__':
-    sp = Spider()
-    sp.login()
-    print("Login success")
-    sp.get_mood_detail()
+    # sp = Spider()
+    # sp.login()
+    # print("Login success")
+    # sp.get_mood_detail()
+    doAnalysis()
