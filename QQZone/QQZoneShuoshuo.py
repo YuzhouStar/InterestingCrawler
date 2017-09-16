@@ -4,6 +4,7 @@ import requests
 import time
 from urllib import parse
 import re
+import redis
 class Spider(object):
     def __init__(self):
         self.web = webdriver.Chrome()
@@ -29,6 +30,8 @@ class Spider(object):
         self.req = requests.Session()
         self.cookies = {}
         self.qzonetoken = ""
+        self.connect_redis()
+        self.content = []
 
     def login(self):
         self.web.switch_to_frame('login_frame')
@@ -99,11 +102,22 @@ class Spider(object):
             url__ = url_Mood + '&pos=' + str(pos)
             mood_detail = self.req.get(url=url__, headers=self.headers)
             jsonContent = self.get_json(str(mood_detail.content.decode('utf-8')))
+            self.content.append(jsonContent)
+
             print(1272082503,jsonContent)
-            with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
-                w.write(jsonContent)
+            #存储到json文件
+            # with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
+            #     w.write(jsonContent)
             pos += 20
-        time.sleep(2)
+            print(pos)
+        # time.sleep(2)
+        self.re.set("QQ", self.content)
+        print(self.content)
+        print("finish")
+
+    def connect_redis(self):
+        pool = redis.ConnectionPool(host="127.0.0.1", port=6379)
+        self.re = redis.Redis(connection_pool=pool)
 
     def get_g_tk(self):
         p_skey = self.cookies[self.cookies.find('p_skey=') + 7: self.cookies.find(';', self.cookies.find('p_skey='))]
