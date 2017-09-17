@@ -36,6 +36,8 @@ class Spider(object):
         self.qzonetoken = ""
         self.re = connect_redis()
         self.content = []
+        self.unikeys = []
+        self.like_list_names = []
 
     def login(self):
         self.web.switch_to_frame('login_frame')
@@ -91,12 +93,11 @@ class Spider(object):
         url = url + parse.urlencode(params)
         return url
 
-
     def get_aggree_url(self):
         url = 'https://user.qzone.qq.com/proxy/domain/users.qzone.qq.com/cgi-bin/likes/get_like_list_app?'
         params = {
             "uin": "1272082503",
-            "unikey": 'http%3A%2F%2Fuser.qzone.qq.com%2F1272082503%2Fmood%2F4770d24be703bc592c390500.1',
+            "unikey": self.unikey,
             "begin_uin": 0,
             "query_count": 60,
             "if_first_page": 1,
@@ -104,7 +105,6 @@ class Spider(object):
         }
         url = url + parse.urlencode(params)
         return url
-
 
     def get_json(self, str1):
         arr = re.findall(r'[^()]+', str1)
@@ -122,17 +122,34 @@ class Spider(object):
             mood_detail = self.req.get(url=url__, headers=self.headers)
             jsonContent = self.get_json(str(mood_detail.content.decode('utf-8')))
             self.content.append(jsonContent)
-
-            print(1272082503,jsonContent)
+            # print(jsonContent)
+            self.unikeys = self.get_unilikeKey(jsonContent)
+            for unikey in self.unikeys:
+                # print('unikey' + unikey)
+                self.unikey = unikey
+                like_detail = self.get_like_list()
+                self.like_list_names.append(like_detail)
+            # print('1272082503', jsonContent)
             # 存储到json文件
-            with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
-                w.write(jsonContent)
+            # with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
+            #     w.write(jsonContent)
             pos += 20
             print(pos)
         # time.sleep(2)
+
+        # print(self.content)
+        self.re = connect_redis()
         self.re.set("QQ", self.content)
-        print(self.content)
+        self.re.set("QQ_like_list", self.like_list_names)
         print("finish")
+
+    def get_like_list(self):
+        url = self.get_aggree_url()
+        print(url)
+        like_list = self.req.get(url=url, headers=self.headers)
+        like_list_detail = self.get_json(like_list.content.decode('utf-8'))
+        print("success to get like list")
+        return like_list_detail
 
 
     def get_g_tk(self):
@@ -144,7 +161,17 @@ class Spider(object):
         self.g_tk = h & 2147483647
 
     def get_unilikeKey(self, mood_detail):
-        jsonData = json.load(mood_detail)
+        allunikey = []
+        jsonData = json.loads(mood_detail)
+        for item in jsonData['msglist']:
+            print(item.keys())
+            if 'pic' in item:
+                itemKey = item['pic']
+                if 'curlikekey' in itemKey[0]:
+                    unikey = itemKey[0]['curlikekey'].split('^||^')
+                    print('unikey:' + unikey[0])
+                    allunikey.append(unikey[0])
+        return allunikey
 
 
 def connect_redis():
@@ -152,27 +179,42 @@ def connect_redis():
     re = redis.Redis(connection_pool=pool)
     return re
 
-
-def doAnalysis():
+def doAnalysis(fileName):
     # re = connect_redis()
     # data = re.get("QQ")
     # data = data.decode('utf-8').replace('\\', '')
     # print(data)
-    f = open("data0.json", encoding='utf-8')
+    f = open(fileName, encoding='utf-8')
     data = json.load(f)
     for item in data['msglist']:
         print(item['content'])
-        print(item.keys())
+        # print(item.keys())
+        time_local = time.localtime(item['created_time'])
+        # 转换成新的时间格式(2016-05-05 20:28:54)
+        dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
+        print(dt)
         # print(item['pic'])
-        for itemKey in item['pic']:
-            print(itemKey['curlikekey'])
-        for item2 in item['commentlist']:
-            print(item2['name'])
+        if 'pic' in item:
+            itemKey = item['pic']
+            if 'curlikekey' in itemKey[0]:
+                unikey = itemKey[0]['curlikekey'].split('^||^')
+                print(unikey)
+        if 'commentlist' in item:
+            for item2 in item['commentlist']:
+                print(item2['name'])
+    f.close()
 
+def getFileName():
+    pos = 0
+    while pos < 2000:
+        fileName = 'data' + str(pos) + '.json'
+        doAnalysis(fileName)
+        pos += 20
+    print("finish")
 
 if __name__ == '__main__':
-    # sp = Spider()
-    # sp.login()
-    # print("Login success")
-    # sp.get_mood_detail()
-    doAnalysis()
+    sp = Spider()
+    sp.login()
+    print("Login success")
+    sp.get_mood_detail()
+    # getFileName()
