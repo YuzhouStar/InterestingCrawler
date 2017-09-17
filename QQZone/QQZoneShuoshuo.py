@@ -9,7 +9,6 @@ import json
 
 
 class Spider(object):
-
     def __init__(self):
         self.web = webdriver.Chrome()
         self.web.get('https://user.qzone.qq.com')
@@ -38,6 +37,8 @@ class Spider(object):
         self.content = []
         self.unikeys = []
         self.like_list_names = []
+        self.tid = ""
+        self.mood_details = []
 
     def login(self):
         self.web.switch_to_frame('login_frame')
@@ -73,6 +74,7 @@ class Spider(object):
         url = url + parse.urlencode(params)
         return url
 
+    # 构造获取动态的URL
     def get_mood_url(self):
         url = 'https://h5.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_msglist_v6?'
         params = {
@@ -93,10 +95,11 @@ class Spider(object):
         url = url + parse.urlencode(params)
         return url
 
+    # 构造点赞的人的URL
     def get_aggree_url(self):
         url = 'https://user.qzone.qq.com/proxy/domain/users.qzone.qq.com/cgi-bin/likes/get_like_list_app?'
         params = {
-            "uin": "1272082503",
+            "uin": self.__username,
             "unikey": self.unikey,
             "begin_uin": 0,
             "query_count": 60,
@@ -106,6 +109,28 @@ class Spider(object):
         url = url + parse.urlencode(params)
         return url
 
+    # 构造获取动态详情的url
+    def get_mood_detail_url(self):
+        url = 'https://user.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_msgdetail_v6?'
+        params = {
+            "uin": self.__username,
+            "unikey": self.unikey,
+            "tid": self.tid,
+            "t1_source": 1,
+            "ftype": 0,
+            "sort": 0,
+            "pos": 0,
+            "num": 20,
+            "callback": "_preloadCallback",
+            "code_version": 1,
+            "format": "jsonp",
+            "need_private_comment": 1,
+            "g_tk": self.g_tk
+        }
+        url = url + parse.urlencode(params)
+        return url
+
+    # 将响应字符串转化为标准Json
     def get_json(self, str1):
         arr = re.findall(r'[^()]+', str1)
         json = ""
@@ -113,24 +138,30 @@ class Spider(object):
             json += arr[i]
         return json
 
-    def get_mood_detail(self):
+
+    # 获取动态详情列表（一页20个）
+    def get_mood_list(self):
         urlMood = self.get_mood_url()
-        url_Mood = urlMood + '&uin=' + str(1272082503)
+        url_Mood = urlMood + '&uin=' + str(self.__username)
         self.re = connect_redis()
         pos = 0
-        while pos < 1700:
+        while pos < 20:
             url__ = url_Mood + '&pos=' + str(pos)
-            mood_detail = self.req.get(url=url__, headers=self.headers)
-            jsonContent = self.get_json(str(mood_detail.content.decode('utf-8')))
+            mood_list = self.req.get(url=url__, headers=self.headers)
+            jsonContent = self.get_json(str(mood_list.content.decode('utf-8')))
             self.content.append(jsonContent)
             # print(jsonContent)
+            # 获取每条动态的unikey
             self.unikeys = self.get_unilikeKey(jsonContent)
             for unikey in self.unikeys:
                 # print('unikey' + unikey)
                 self.unikey = unikey
                 like_detail = self.get_like_list()
-
+                print("like:" + str(like_detail))
                 self.like_list_names.append(like_detail)
+                self.tid = self.get_tid(unikey)
+                mood_detail = self.get_mood_detail()
+                self.mood_details.append(mood_detail)
             # print('1272082503', jsonContent)
             # 存储到json文件
             with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
@@ -143,23 +174,45 @@ class Spider(object):
         with open('agree' + '.json', 'w', encoding='utf-8') as w2:
             json.dump(self.like_list_names, w2, ensure_ascii=False)
 
+        with open('mood_detail' + '.json', 'w', encoding='utf-8') as w3:
+            json.dump(self.mood_details, w3, ensure_ascii=False)
+
         print(self.content)
-        print(json.dumps(self.content))
+        print("content:" + json.dumps(self.content))
         print("=====================")
-        print(json.dumps(self.like_list_names, ensure_ascii=False))
+        print("agree" + json.dumps(self.like_list_names, ensure_ascii=False))
         self.re.set("QQ", json.dumps(self.content, ensure_ascii=False))
         self.re.set("QQ_like_list_all", json.dumps(self.like_list_names, ensure_ascii=False))
+        self.re.set("QQ_mood_details", json.dumps(self.mood_details, ensure_ascii=False))
         print("finish")
 
+    # 获得点赞的人
     def get_like_list(self):
         url = self.get_aggree_url()
-        # print(url)
+        print(url)
         like_list = self.req.get(url=url, headers=self.headers)
         like_list_detail = self.get_json(like_list.content.decode('utf-8'))
-        like_list_detail = like_list_detail.replace('\\n', '')
+        # like_list_detail = like_list_detail.replace('\\n', '')
+        print(like_list_detail)
         # print("success to get like list")
         return like_list_detail
 
+    # 获得每一条说说的详细内容
+    def get_mood_detail(self):
+        urlDetail = self.get_mood_detail_url()
+        mood_detail = self.req.get(url=urlDetail, headers=self.headers)
+        json_mood = self.get_json(str(mood_detail.content.decode('utf-8')))
+
+        return json_mood
+
+    # 根据unikey 获得tid
+    def get_tid(self, unikey):
+        # unikey是链接，形如：http://user.qzone.qq.com/1272082503/mood/4770d24bc5bb7459cc140200.1
+        #其中，4770d24bc5bb7459cc14020是tid
+        tids = unikey.split("/")
+        tid = tids[5].split(".")
+        # print(tid)
+        return tid[0]
 
     def get_g_tk(self):
         p_skey = self.cookies[self.cookies.find('p_skey=') + 7: self.cookies.find(';', self.cookies.find('p_skey='))]
@@ -220,8 +273,6 @@ def doAnalysis(fileName, commentNumber, commentList):
                 # print(item2['name'])
         else:
             commentNumber.append(0)
-
-
     f.close()
 
 def getFileName():
@@ -260,8 +311,8 @@ def getFileName():
     f.close()
 
 if __name__ == '__main__':
-    # sp = Spider()
-    # sp.login()
-    # print("Login success")
-    # sp.get_mood_detail()
-    getFileName()
+    sp = Spider()
+    sp.login()
+    print("Login success")
+    sp.get_mood_list()
+    # getFileName()
