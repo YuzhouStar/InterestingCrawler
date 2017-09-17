@@ -14,7 +14,7 @@ class Spider(object):
         self.web = webdriver.Chrome()
         self.web.get('https://user.qzone.qq.com')
         self.__username = '1272082503'
-        self.__password = 'yuanhao110110HAO'
+        self.__password = ''
         self.headers = {
             'host': 'h5.qzone.qq.com',
             'accept-encoding': 'gzip, deflate, br',
