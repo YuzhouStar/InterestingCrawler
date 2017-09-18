@@ -13,7 +13,7 @@ class Spider(object):
         self.web = webdriver.Chrome()
         self.web.get('https://user.qzone.qq.com')
         self.__username = '1272082503'
-        self.__password = ''
+        self.__password = 'yuanhao110110HAO'
         self.headers = {
             'host': 'h5.qzone.qq.com',
             'accept-encoding': 'gzip, deflate, br',
@@ -145,7 +145,7 @@ class Spider(object):
         url_Mood = urlMood + '&uin=' + str(self.__username)
         self.re = connect_redis()
         pos = 0
-        while pos < 20:
+        while pos < 1700:
             url__ = url_Mood + '&pos=' + str(pos)
             mood_list = self.req.get(url=url__, headers=self.headers)
             jsonContent = self.get_json(str(mood_list.content.decode('utf-8')))
@@ -157,7 +157,7 @@ class Spider(object):
                 # print('unikey' + unikey)
                 self.unikey = unikey
                 like_detail = self.get_like_list()
-                print("like:" + str(like_detail))
+                # print("like:" + str(like_detail))
                 self.like_list_names.append(like_detail)
                 self.tid = self.get_tid(unikey)
                 mood_detail = self.get_mood_detail()
@@ -167,6 +167,10 @@ class Spider(object):
             with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
                 w.write(jsonContent)
             pos += 20
+            if pos % 100 == 0:
+                self.re.set("QQ", json.dumps(self.content, ensure_ascii=False))
+                self.re.set("QQ_like_list_all", json.dumps(self.like_list_names, ensure_ascii=False))
+                self.re.set("QQ_mood_details", json.dumps(self.mood_details, ensure_ascii=False))
             print(pos)
         # time.sleep(2)
 
@@ -193,13 +197,14 @@ class Spider(object):
         like_list = self.req.get(url=url, headers=self.headers)
         like_list_detail = self.get_json(like_list.content.decode('utf-8'))
         # like_list_detail = like_list_detail.replace('\\n', '')
-        print(like_list_detail)
+        # print(like_list_detail)
         # print("success to get like list")
         return like_list_detail
 
     # 获得每一条说说的详细内容
     def get_mood_detail(self):
         urlDetail = self.get_mood_detail_url()
+        print(urlDetail)
         mood_detail = self.req.get(url=urlDetail, headers=self.headers)
         json_mood = self.get_json(str(mood_detail.content.decode('utf-8')))
 
@@ -225,6 +230,7 @@ class Spider(object):
     def get_unilikeKey(self, mood_detail):
         allunikey = []
         jsonData = json.loads(mood_detail)
+        # print(jsonData)
         for item in jsonData['msglist']:
             # print(item.keys())
             if 'pic' in item:
