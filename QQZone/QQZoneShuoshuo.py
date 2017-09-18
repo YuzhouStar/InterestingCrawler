@@ -247,12 +247,12 @@ def connect_redis():
     re = redis.Redis(connection_pool=pool)
     return re
 
-def doAnalysis(fileName, commentNumber, commentList):
+def doAnalysis(file_name, commentNumber, commentList):
     # re = connect_redis()
     # data = re.get("QQ")
     # data = data.decode('utf-8').replace('\\', '')
     # print(data)
-    f = open(fileName, encoding='utf-8')
+    f = open(file_name, encoding='utf-8')
     data = json.load(f)
     agreeDict = []
     for item in data['msglist']:
@@ -280,6 +280,17 @@ def doAnalysis(fileName, commentNumber, commentList):
         else:
             commentNumber.append(0)
     f.close()
+
+def analysisMoodDetails():
+    f = open('mood_detail.json', encoding='utf-8')
+    data = json.load(f)
+    mood_words = ""
+    for item in data:
+        mood = json.loads(item)
+        # print(mood.keys())
+        mood_words += mood['content']
+    with open('mood_details.txt', 'w', encoding='utf-8') as mood_writer:
+        mood_writer.write(mood_words)
 
 def getFileName():
     commentList = {}
@@ -317,8 +328,9 @@ def getFileName():
     f.close()
 
 if __name__ == '__main__':
-    sp = Spider()
-    sp.login()
-    print("Login success")
-    sp.get_mood_list()
+    # sp = Spider()
+    # sp.login()
+    # print("Login success")
+    # sp.get_mood_list()
     # getFileName()
+    analysisMoodDetails()
