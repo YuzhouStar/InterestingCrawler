@@ -164,7 +164,7 @@ class Spider(object):
                 self.mood_details.append(mood_detail)
             # print('1272082503', jsonContent)
             # 存储到json文件
-            with open('data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
+            with open('data/data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
                 w.write(jsonContent)
             pos += 20
             if pos % 100 == 0:
@@ -175,10 +175,10 @@ class Spider(object):
         # time.sleep(2)
 
         # print(self.content)
-        with open('agree' + '.json', 'w', encoding='utf-8') as w2:
+        with open('data/like' + '.json', 'w', encoding='utf-8') as w2:
             json.dump(self.like_list_names, w2, ensure_ascii=False)
 
-        with open('mood_detail' + '.json', 'w', encoding='utf-8') as w3:
+        with open('data/mood_detail' + '.json', 'w', encoding='utf-8') as w3:
             json.dump(self.mood_details, w3, ensure_ascii=False)
 
         print(self.content)
@@ -282,14 +282,14 @@ def doAnalysis(file_name, commentNumber, commentList):
     f.close()
 
 def analysisMoodDetails():
-    f = open('mood_detail.json', encoding='utf-8')
+    f = open('data/mood_detail.json', encoding='utf-8')
     data = json.load(f)
     mood_words = ""
     for item in data:
         mood = json.loads(item)
         # print(mood.keys())
         mood_words += mood['content']
-    with open('mood_details.txt', 'w', encoding='utf-8') as mood_writer:
+    with open('data/mood_details.txt', 'w', encoding='utf-8') as mood_writer:
         mood_writer.write(mood_words)
 
 def getFileName():
@@ -297,10 +297,10 @@ def getFileName():
     commentNumber = []
     pos = 0
     while pos < 1700:
-        fileName = 'data' + str(pos) + '.json'
+        fileName = 'data/data' + str(pos) + '.json'
         doAnalysis(fileName, commentNumber, commentList)
         pos += 20
-    f = open('agree.json', encoding='utf-8')
+    f = open('data/like.json', encoding='utf-8')
     data = json.load(f)
     totalAgree = 0
     agreeNick = {}
