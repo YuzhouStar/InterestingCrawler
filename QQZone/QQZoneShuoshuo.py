@@ -1,4 +1,9 @@
 # coding:utf-8
+# 爬取 自己 的QQ空间动态并做分析
+# 包括动态内容、点赞的人、评论的人、评论的话
+# 登陆使用的是Selenium， 无法识别验证码
+# 若出现验证码，则先尝试手动从浏览器登陆并退出再运行程序
+
 from selenium import webdriver
 import requests
 import time
@@ -12,8 +17,8 @@ class Spider(object):
     def __init__(self):
         self.web = webdriver.Chrome()
         self.web.get('https://user.qzone.qq.com')
-        self.__username = '1272082503'
-        self.__password = ''
+        self.__username = '12720825033'
+        self.__password = 'yuanhao110110HAO'
         self.headers = {
             'host': 'h5.qzone.qq.com',
             'accept-encoding': 'gzip, deflate, br',
@@ -40,6 +45,7 @@ class Spider(object):
         self.tid = ""
         self.mood_details = []
 
+    # 模拟登陆， 需要selenium
     def login(self):
         self.web.switch_to_frame('login_frame')
         log = self.web.find_element_by_id("switcher_plogin")
@@ -50,9 +56,9 @@ class Spider(object):
         ps = self.web.find_element_by_id('p')
         ps.send_keys(self.__password)
         btn = self.web.find_element_by_id('login_button')
-        time.sleep(1)
+        time.sleep(5)
         btn.click()
-        time.sleep(2)
+        time.sleep(5)
         self.web.get('https://user.qzone.qq.com/{}'.format(self.__username))
         cookie = ''
         for elem in self.web.get_cookies():
@@ -61,18 +67,6 @@ class Spider(object):
         self.get_g_tk()
         self.headers['Cookie'] = self.cookies
         self.web.quit()
-
-    def get_aggree_url(self):
-        url = "https://h5.qzone.qq.com/proxy/domain/users.qzone.qq.com/cgi-bin/likes/get_like_list_app?"
-        params = {
-            "unikey": "",
-            "begin_uin":0,
-            "query_count":60,
-            "if_first_page=1":1,
-            "g_tk": self.g_tk
-        }
-        url = url + parse.urlencode(params)
-        return url
 
     # 构造获取动态的URL
     def get_mood_url(self):
@@ -138,13 +132,13 @@ class Spider(object):
             json += arr[i]
         return json
 
-
     # 获取动态详情列表（一页20个）
     def get_mood_list(self):
         urlMood = self.get_mood_url()
         url_Mood = urlMood + '&uin=' + str(self.__username)
         self.re = connect_redis()
         pos = 0
+        # 1700为我空间动态数量
         while pos < 1700:
             url__ = url_Mood + '&pos=' + str(pos)
             mood_list = self.req.get(url=url__, headers=self.headers)
@@ -153,13 +147,16 @@ class Spider(object):
             # print(jsonContent)
             # 获取每条动态的unikey
             self.unikeys = self.get_unilikeKey(jsonContent)
+            # 获取点赞的人的详情列表
             for unikey in self.unikeys:
-                # print('unikey' + unikey)
+                print('unikey' + unikey)
                 self.unikey = unikey
                 like_detail = self.get_like_list()
-                # print("like:" + str(like_detail))
+
                 self.like_list_names.append(like_detail)
                 self.tid = self.get_tid(unikey)
+
+                # 获取动态详情
                 mood_detail = self.get_mood_detail()
                 self.mood_details.append(mood_detail)
             # print('1272082503', jsonContent)
@@ -167,6 +164,7 @@ class Spider(object):
             with open('data/data' + str(pos) + '.json', 'w', encoding='utf-8') as w:
                 w.write(jsonContent)
             pos += 20
+            # 每抓100条保存一次数据到redis，如果没有redis需要注释掉这部分
             if pos % 100 == 0:
                 self.re.set("QQ", json.dumps(self.content, ensure_ascii=False))
                 self.re.set("QQ_like_list_all", json.dumps(self.like_list_names, ensure_ascii=False))
@@ -175,6 +173,7 @@ class Spider(object):
         # time.sleep(2)
 
         # print(self.content)
+        # 保存所有数据到指定文件
         with open('data/like' + '.json', 'w', encoding='utf-8') as w2:
             json.dump(self.like_list_names, w2, ensure_ascii=False)
 
@@ -185,6 +184,8 @@ class Spider(object):
         print("content:" + json.dumps(self.content))
         print("=====================")
         print("agree" + json.dumps(self.like_list_names, ensure_ascii=False))
+
+        # 保存数据到redis， 如没有redis需要注释掉这部分
         self.re.set("QQ", json.dumps(self.content, ensure_ascii=False))
         self.re.set("QQ_like_list_all", json.dumps(self.like_list_names, ensure_ascii=False))
         self.re.set("QQ_mood_details", json.dumps(self.mood_details, ensure_ascii=False))
@@ -204,7 +205,7 @@ class Spider(object):
     # 获得每一条说说的详细内容
     def get_mood_detail(self):
         urlDetail = self.get_mood_detail_url()
-        print(urlDetail)
+        # print(urlDetail)
         mood_detail = self.req.get(url=urlDetail, headers=self.headers)
         json_mood = self.get_json(str(mood_detail.content.decode('utf-8')))
 
@@ -213,12 +214,12 @@ class Spider(object):
     # 根据unikey 获得tid
     def get_tid(self, unikey):
         # unikey是链接，形如：http://user.qzone.qq.com/1272082503/mood/4770d24bc5bb7459cc140200.1
-        #其中，4770d24bc5bb7459cc14020是tid
+        # 其中，4770d24bc5bb7459cc14020是tid
         tids = unikey.split("/")
         tid = tids[5].split(".")
-        # print(tid)
         return tid[0]
 
+    # 核心加密字段
     def get_g_tk(self):
         p_skey = self.cookies[self.cookies.find('p_skey=') + 7: self.cookies.find(';', self.cookies.find('p_skey='))]
         h = 5381
@@ -227,6 +228,8 @@ class Spider(object):
         print('g_tk', h & 2147483647)
         self.g_tk = h & 2147483647
 
+    # 这里是从每条说说的图片地址中截取unikey，如果该条说说没有图片，则获取不到
+    # unikey 是用于辨别每条说说的唯一识别码
     def get_unilikeKey(self, mood_detail):
         allunikey = []
         jsonData = json.loads(mood_detail)
@@ -247,11 +250,8 @@ def connect_redis():
     re = redis.Redis(connection_pool=pool)
     return re
 
+
 def doAnalysis(file_name, commentNumber, commentList):
-    # re = connect_redis()
-    # data = re.get("QQ")
-    # data = data.decode('utf-8').replace('\\', '')
-    # print(data)
     f = open(file_name, encoding='utf-8')
     data = json.load(f)
     agreeDict = []
@@ -262,8 +262,6 @@ def doAnalysis(file_name, commentNumber, commentList):
         # 转换成新的时间格式(2016-05-05 20:28:54)
         dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
         print(dt)
-        # print(item['pic'])
-
         if 'pic' in item:
             itemKey = item['pic']
             if 'curlikekey' in itemKey[0]:
@@ -273,13 +271,14 @@ def doAnalysis(file_name, commentNumber, commentList):
             commentNumber.append(len(item['commentlist']))
             for item2 in item['commentlist']:
                 if item2['name'] in commentList:
-                    commentList[item2['name']] +=1
+                    commentList[item2['name']] += 1
                 else:
                     commentList[item2['name']] = 1
-                # print(item2['name'])
+                    # print(item2['name'])
         else:
             commentNumber.append(0)
     f.close()
+
 
 def analysisMoodDetails():
     f = open('data/mood_detail.json', encoding='utf-8')
@@ -292,7 +291,8 @@ def analysisMoodDetails():
     with open('data/mood_details.txt', 'w', encoding='utf-8') as mood_writer:
         mood_writer.write(mood_words)
 
-def getFileName():
+# 计算点赞的人、评论的人
+def calculate_info():
     commentList = {}
     commentNumber = []
     pos = 0
@@ -321,16 +321,24 @@ def getFileName():
     print("累计点赞数：" + str(totalAgree))
     print("平均点赞数" + str(totalAgree / 1700))
     print("点赞次数" + str(agreeNumberList))
-    print("点赞的人：" + str(sorted(agreeNick.items(), key= lambda item2: item2[1], reverse=True)))
+    print("点赞的人：" + str(sorted(agreeNick.items(), key=lambda item2: item2[1], reverse=True)))
     # print("评论数:" + str(commentNumber))
     print("给我评论的人：" + str(sorted(commentList.items(), key=lambda nameItem: nameItem[1], reverse=True)))
     print("finish")
     f.close()
 
+
+def capture_data():
+    sp = Spider()
+    sp.login()
+    print("Login success")
+    sp.get_mood_list()
+    print("Finish to capture")
+
 if __name__ == '__main__':
-    # sp = Spider()
-    # sp.login()
-    # print("Login success")
-    # sp.get_mood_list()
-     getFileName()
-    #analysisMoodDetails()
+    # 执行capture_data以为的函数时请注释掉capture_data
+    capture_data()
+
+    # 计算一些信息
+    calculate_info()
+    # analysisMoodDetails()
